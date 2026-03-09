@@ -1,109 +1,136 @@
-## :warning: 301 Moved Permanently
-Location: https://gitlab.com/kicad/libraries/kicad-footprint-generator
+# KiCad Footprint Generator — IPC-7351 Multi-Density Edition
 
----
-
-This repository contains scripts to generate custom KiCAD footprints using python, and a framework which allows us to
-create custom KiCAD footprint. A big bunch of footprints of the KiCad library was developed using this framework.
-
-# KicadModTree
+Based on [pointhi/kicad-footprint-generator](https://github.com/pointhi/kicad-footprint-generator),
+this fork adds support for generating footprint libraries at all three
+**IPC-7351** density levels and applies consistent post-processing to every
+generated footprint.
 
 **Licence:** GNU GPLv3+
 
-**Maintainer:** Thomas Pointhuber
+## IPC-7351 Density Levels
 
-[![Build Status](https://travis-ci.org/pointhi/kicad-footprint-generator.svg?branch=master)](https://travis-ci.org/pointhi/kicad-footprint-generator)
-[![Code Climate](https://codeclimate.com/github/pointhi/kicad-footprint-generator/badges/gpa.svg)](https://codeclimate.com/github/pointhi/kicad-footprint-generator)
-[![Documentation Status](https://readthedocs.org/projects/kicad-footprint-generator/badge/?version=latest)](http://kicad-footprint-generator.readthedocs.io/en/latest/?badge=latest)
+IPC-7351 defines three land-pattern density levels that trade soldering
+ease against board area:
 
-**Supports:** Python 2.7 and 3.3+
+| Level | Directory | Description |
+|-------|-----------|-------------|
+| **M** (Most) | `newfp/M/` | Maximum pad size — easiest to solder, largest footprint |
+| **N** (Nominal) | `newfp/N/` | Standard pad size — general-purpose |
+| **L** (Least) | `newfp/L/` | Minimum pad size — smallest footprint, tightest boards |
 
-## About
+Generators that natively support the `--density` / `--all-densities`
+flags (IPC gullwing, QFN/DFN, BGA, PLCC, SMD chip, electrolytic
+capacitors) write directly into the appropriate density sub-directory.
+For generators that produce only a single density, the build script
+reconciles the output so that every `.pretty` library appears in all
+three directories (copying N→M, N→L, or L→N as needed).
 
-I started drawing a bunch of similar footprints for KiCAD, like connectors which are mainly one base shape, and different
-amount of pins. To be able to update/improve those footprints quickly I decided to write my own footprint generator Framework,
-to allow simple creation of easy as well complex shapes.
-
-This is my second approach (the first one can be found in the git history). This solution should be able to be easy to
-use, to read and also be easy to expand with custom nodes.
-
-
-## Overview
-
-This framework is mainly based on the idea of scripted CAD systems (for example OpenSCAD). This means, everything is a
-node, and can be structured like a tree. In other words, you can group parts of the footprint, and translate them in any
-way you want. Also cloning & co. is no problem anymore because of this concept.
-
-To be able to create custom Nodes, I separated the system in two parts. Base nodes, which represents simple structures
-and also be used by KiCAD itself, and specialized nodes which alter the behaviour of base nodes (for example positioning),
-or represent a specialized usage of base nodes (for example RectLine).
-
-When you serialize your footprint, the serialize command only has to handle base nodes, because all other nodes are based
-upon the base nodes. This allows us to write specialized nodes without worrying about the FileHandlers or other core systems.
-You simply create your special node, and the framework knows how to handle it seamlessly.
-
-Please look into the **[Documentation](http://kicad-footprint-generator.readthedocs.io/en/latest/)** for further details
-
-```
-KicadModTree        - The KicadModTree framework which is used for footprint generation
-docs                - Files required to generate a sphinx documentation
-scripts             - scripts which are generating footprints based on this library
-```
-
-## Development
-
-### Install development Dependencies
+## Quick Start
 
 ```sh
-manage.sh update_dev_packages
+cd scripts
+python3 -m venv ../../.venv && source ../../.venv/bin/activate
+pip install -r ../requirements.txt
+bash regenerate_all.sh
 ```
 
-### run tests
+`regenerate_all.sh` runs every generator in parallel, collects the
+output into `scripts/newfp/{M,N,L}/`, reconciles densities, and
+applies post-processing. On a typical machine it finishes in ~3 minutes
+and produces ~25,000 footprints.
+
+## Post-Processing (`tidykicadfp.py`)
+
+After generation, `scripts/tools/tidykicadfp.py` is run across every
+footprint in every density directory. It can also be used standalone on
+any `.kicad_mod` file or `.pretty` directory. The post-processing steps
+are:
+
+### Pin 1 Marker Triangle
+
+A small filled triangle is added to the silkscreen layer near pad 1.
+The triangle is placed outside the pad extent, approaching from the
+direction that has the most clearance (left, right, top, or bottom).
+Its size is clamped so it never extends beyond the courtyard boundary.
+THT footprints additionally have pad 1 converted from a circle to a
+rectangle for visual identification.
+
+### Courtyard Generation
+
+If a footprint has no courtyard lines, or its existing courtyard is
+smaller than the computed one, a new `F.CrtYd` rectangle is generated:
+
+- **Margin:** 0.25 mm beyond the bounding box of all pads and graphic
+  elements (text is excluded from the bounding box).
+- **Grid snap:** Coordinates are snapped outward to the nearest 0.05 mm.
+- **Line width:** 0.05 mm.
+
+### Rect-to-Roundrect Pad Conversion
+
+All rectangular SMD pads are converted to roundrect with a corner
+radius ratio of 0.25 (i.e. the corner radius is 25% of the shorter
+pad dimension). This matches the IPC-7351 recommended land-pattern
+shape and improves solder paste release.
+
+## Standalone Usage
+
+`tidykicadfp.py` can be used independently on any footprint library:
 
 ```sh
-manage.sh tests
+# Process a single file
+python3 scripts/tools/tidykicadfp.py path/to/footprint.kicad_mod
+
+# Recursively process a .pretty directory
+python3 scripts/tools/tidykicadfp.py -r path/to/Library.pretty/
+
+# Dry run (report changes without writing)
+python3 scripts/tools/tidykicadfp.py --dry-run -r path/to/Library.pretty/
+
+# Use multiple workers
+python3 scripts/tools/tidykicadfp.py -r -j 8 path/to/Library.pretty/
 ```
 
-## Example Script
+Options:
 
-```python
-from KicadModTree import *
+| Flag | Description |
+|------|-------------|
+| `-r` | Recurse into directories |
+| `-j N` | Use N parallel workers (default: CPU count) |
+| `--dry-run` | Report what would change without writing files |
+| `--force` | Re-add pin 1 marker even if one already exists |
+| `--approach DIR` | Force triangle approach direction (left/right/top/bottom) |
+| `--side F` | Triangle side length multiplier (default: 1.0) |
+| `--width W` | Triangle line width; 0 = filled (default: 0) |
 
-footprint_name = "example_footprint"
+## Project Structure
 
-# init kicad footprint
-kicad_mod = Footprint(footprint_name)
-kicad_mod.setDescription("A example footprint")
-kicad_mod.setTags("example")
-
-# set general values
-kicad_mod.append(Text(type='reference', text='REF**', at=[0, -3], layer='F.SilkS'))
-kicad_mod.append(Text(type='value', text=footprint_name, at=[1.5, 3], layer='F.Fab'))
-
-# create silscreen
-kicad_mod.append(RectLine(start=[-2, -2], end=[5, 2], layer='F.SilkS'))
-
-# create courtyard
-kicad_mod.append(RectLine(start=[-2.25, -2.25], end=[5.25, 2.25], layer='F.CrtYd'))
-
-# create pads
-kicad_mod.append(Pad(number=1, type=Pad.TYPE_THT, shape=Pad.SHAPE_RECT,
-                     at=[0, 0], size=[2, 2], drill=1.2, layers=Pad.LAYERS_THT))
-kicad_mod.append(Pad(number=2, type=Pad.TYPE_THT, shape=Pad.SHAPE_CIRCLE,
-                     at=[3, 0], size=[2, 2], drill=1.2, layers=Pad.LAYERS_THT))
-
-# add model
-kicad_mod.append(Model(filename="example.3dshapes/example_footprint.wrl",
-                       at=[0, 0, 0], scale=[1, 1, 1], rotate=[0, 0, 0]))
-
-# output kicad model
-file_handler = KicadFileHandler(kicad_mod)
-file_handler.writeFile('example_footprint.kicad_mod')
 ```
-## Usage Steps
+KicadModTree/           - The KicadModTree framework for footprint generation
+scripts/                - Generator scripts, organised by component family
+scripts/tools/          - Shared tools and helpers
+  tidykicadfp.py        - Post-processing: pin 1 marker, courtyard, roundrect
+  ipc_density_helpers.py - Density subdirectory helpers, pin 1 marker functions
+  center_footprint.py   - Footprint centering utility
+scripts/regenerate_all.sh - Parallel master build script
+scripts/newfp/          - Generated output (M/N/L density directories)
+```
 
-1. Navigate into the `scripts` directory, and look for the type of footprint you would like to generate. For example, if you wish to generate an SMD inductor footprint, `cd` into `scripts/Inductor_SMD`.
-2. Open the \*.yaml (or \*.yml) file in a text editor. Study a few of the existing footprint definitions to get an idea of how your new footprint entry should be structured.
-3. Add your new footprint by inserting your own new section in the file. An easy way to do this is by simply copying an existing footprint definition, and modifying it to suit your part. Note:  You may have to add or remove additional parameters that are not listed.
-4. Save your edits and close the text editor.
-5. Run the python script, passing the \*.yaml or (\*.yml) file as a parameter, e.g. `python3 Inductor_SMD.py Inductor_SMD.yml`. This will generate the \*.kicad_mod files for each footprint defined in the \*.yaml (or \*.yml).
+## Changes from Upstream
+
+This fork includes the following modifications to the original generators:
+
+- **IPC generators** (gullwing, noLead, BGA, PLCC): output to M/N/L density
+  sub-directories via `ipc_density_helpers.get_density_subdir()`.
+- **SMD chip and electrolytic capacitor generators**: density-aware output.
+- **Bug fixes**: BGA undefined variable, CP_Elec_round YAML key mismatch,
+  mecf_connector 3D coordinates in 2D vectors, pin_headers absolute path,
+  socket_strips typo, Python 2→3 syntax in potentiometers, Hirose/Samtec
+  connector fixes.
+- **KicadModTree**: `fill` parameter support for Circle and Polygon nodes.
+
+## Original Framework
+
+The underlying KicadModTree framework is by
+[Thomas Pointhuber](https://github.com/pointhi/kicad-footprint-generator).
+See the original [documentation](http://kicad-footprint-generator.readthedocs.io/en/latest/)
+for details on writing custom generator scripts.
