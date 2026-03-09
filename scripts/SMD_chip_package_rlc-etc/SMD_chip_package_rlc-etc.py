@@ -14,6 +14,7 @@ sys.path.append(os.path.join(sys.path[0], "..", "tools"))  # load parent path of
 from footprint_text_fields import addTextFields
 from ipc_pad_size_calculators import *
 from drawing_tools import nearestSilkPointOnOrthogonalLineSmallClerance
+from ipc_density_helpers import add_pin1_marker_triangle
 
 size_definition_path = "size_definitions/"
 def roundToBase(value, base):
@@ -202,10 +203,19 @@ class TwoTerminalSMDchip():
             layers=layers_main, **merge_dicts(pad_details, pad_shape_details))
         pad_radius = P1.getRoundRadius()
 
+        # Save pin 1 position before pad_details is mutated
+        pin1_pos = (pad_details['at'][0], pad_details['at'][1])
+        pin1_pad_size = (pad_details['size'][0], pad_details['size'][1])
+
         kicad_mod.append(P1)
         pad_details['at'][0] *= (-1)
         kicad_mod.append(Pad(number= 2, type=Pad.TYPE_SMT,
             layers=layers_main, **merge_dicts(pad_details, pad_shape_details)))
+
+        # Pin 1 marker triangle
+        add_pin1_marker_triangle(kicad_mod, pin1_pos, pin1_pad_size,
+                                 approach='left',
+                                 silk_line_width=silk_line_width)
 
         fab_outline = self.configuration.get('fab_outline', 'typical')
         if fab_outline == 'max':
@@ -321,7 +331,7 @@ class TwoTerminalSMDchip():
 
         kicad_mod.append(Model(filename=model_name))
         output_dir = '{lib_name:s}.pretty/'.format(lib_name=footprint_group_data['fp_lib_name'])
-        if not os.path.isdir(output_dir): #returns false if path does not yet exist!! (Does not check path validity)
+        if not os.path.isdir(output_dir):
             os.makedirs(output_dir)
         filename =  '{outdir:s}{fp_name:s}.kicad_mod'.format(outdir=output_dir, fp_name=fp_name)
 

@@ -11,7 +11,8 @@ sys.path.append(os.path.join(sys.path[0], "..", ".."))  # load parent path of Ki
 
 from KicadModTree import *  # NOQA
 from KicadModTree.nodes.base.Pad import Pad  # NOQA
-
+sys.path.append(os.path.join(sys.path[0], "..", "tools"))
+from ipc_density_helpers import add_pin1_marker_triangle
 
 def create_footprint(name, configuration, **kwargs):
     kicad_mod = Footprint(name)
@@ -164,10 +165,17 @@ def create_footprint(name, configuration, **kwargs):
 
     # create pads
     x_pad_spacing = kwargs['pad_spacing'] / 2. + kwargs['pad_length'] / 2.
+    pin1_pos = (-x_pad_spacing, 0)
+    pin1_pad_size = (kwargs['pad_length'], kwargs['pad_width'])
     kicad_mod.append(Pad(number= 1, at=[-x_pad_spacing, 0],
                          size=[kwargs['pad_length'], kwargs['pad_width']], **pad_kwargs))
     kicad_mod.append(Pad(number= 2, at=[x_pad_spacing, 0],
                          size=[kwargs['pad_length'], kwargs['pad_width']], **pad_kwargs))
+
+    # pin 1 triangle marker on silkscreen
+    silk_line_width = configuration.get('silk_line_width', 0.12)
+    add_pin1_marker_triangle(kicad_mod, pin1_pos, pin1_pad_size,
+                             approach='left', silk_line_width=silk_line_width)
 
     lib_name ='Capacitor_SMD'
     # add model
@@ -177,7 +185,7 @@ def create_footprint(name, configuration, **kwargs):
 
     # write file
     output_dir = '{lib_name:s}.pretty/'.format(lib_name=lib_name)
-    if not os.path.isdir(output_dir): #returns false if path does not yet exist!! (Does not check path validity)
+    if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
 
     filename = '{outdir:s}{fp_name:s}.kicad_mod'.format(outdir=output_dir, fp_name=name)
@@ -191,7 +199,18 @@ def parse_and_execute_yml_file(filepath, configuration):
             yaml_parsed = yaml.safe_load(stream)
             for footprint in yaml_parsed:
                 print("generate {name}.kicad_mod".format(name=footprint))
-                create_footprint(footprint, configuration , **yaml_parsed.get(footprint))
+                fp_data = dict(yaml_parsed.get(footprint))
+                # Translate newer IPC-style YAML keys to the flat keys expected
+                # by create_footprint().
+                fp_data['description'] = fp_data.pop('extra_description', footprint)
+                for old_key, new_key in [('body_length', 'length'),
+                                         ('body_width', 'width'),
+                                         ('body_height', 'height'),
+                                         ('body_diameter', 'diameter')]:
+                    val = fp_data.pop(old_key, None)
+                    if val is not None:
+                        fp_data[new_key] = val['nominal'] if isinstance(val, dict) else val
+                create_footprint(footprint, configuration, **fp_data)
         except yaml.YAMLError as exc:
             print(exc)
 

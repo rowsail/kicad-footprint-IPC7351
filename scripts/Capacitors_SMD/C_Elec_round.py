@@ -12,6 +12,7 @@ from KicadModTree.nodes.base.Pad import Pad  # NOQA
 
 sys.path.append(os.path.join(sys.path[0], "..", "tools"))  # load parent path of tools
 from ipc_pad_size_calculators import *
+from ipc_density_helpers import add_pin1_marker_triangle, get_density_subdir, ALL_DENSITY_LEVELS
 
 def create_footprint(name, configuration, **kwargs):
     kicad_mod = Footprint(name)
@@ -112,9 +113,16 @@ def create_footprint(name, configuration, **kwargs):
     else:
         raise KeyError("Provide all three 'pad' or 'lead' properties ('_spacing', '_length', and '_width')")
 
+    pin1_pos = (-x_pad_spacing, 0)
+    pin1_pad_size = (pad_params['size'][0], pad_params['size'][1])
     kicad_mod.append(Pad(number=1, at=[-x_pad_spacing, 0], **pad_params))
     kicad_mod.append(Pad(number=2, at=[x_pad_spacing, 0], **pad_params))
-    
+
+    # pin 1 triangle marker on silkscreen
+    silk_line_width = configuration.get('silk_line_width', 0.12)
+    add_pin1_marker_triangle(kicad_mod, pin1_pos, pin1_pad_size,
+                             approach='left', silk_line_width=silk_line_width)
+
     # create fabrication layer
     fab_x = body_size['length'] / 2.0
     fab_y = body_size['width'] / 2.0
@@ -238,8 +246,9 @@ def create_footprint(name, configuration, **kwargs):
                             at=[0, 0, 0], scale=[1, 1, 1], rotate=[0, 0, 0]))
 
     # write file
-    output_dir = '{lib_name:s}.pretty/'.format(lib_name=lib_name)
-    if not os.path.isdir(output_dir): #returns false if path does not yet exist!! (Does not check path validity)
+    density_dir = get_density_subdir(configuration.get('ipc_density', 'nominal'))
+    output_dir = os.path.join(density_dir, '{lib_name:s}.pretty'.format(lib_name=lib_name), '')
+    if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
 
     filename = '{outdir:s}{fp_name:s}.kicad_mod'.format(outdir=output_dir, fp_name=name)
@@ -253,7 +262,8 @@ if __name__ == "__main__":
     parser.add_argument('--global_config', type=str, nargs='?', help='the config file defining how the footprint will look like. (KLC)', default='../tools/global_config_files/config_KLCv3.0.yaml')
     parser.add_argument('--series_config', type=str, nargs='?', help='the config file defining series parameters.', default='../SMD_chip_package_rlc-etc/config_KLCv3.0.yaml')
     parser.add_argument('--ipc_definition', type=str, nargs='?', help='the IPC definition file', default='ipc7351B_capae_crystal.yaml')
-    parser.add_argument('--ipc_density', type=str, nargs='?', help='the IPC desnity', default='nominal')
+    parser.add_argument('--ipc_density', type=str, nargs='?', help='the IPC density', default='nominal')
+    parser.add_argument('--all-densities', action='store_true', help='Generate footprints for all three IPC density levels (M/N/L).')
     parser.add_argument('--force_rectangle_pads', action='store_true', help='Force the generation of rectangle pads instead of rounded rectangle (KiCad 4.x compatibility.)')
     #parser.add_argument('-v', '--verbose', help='show more information when creating footprint', action='store_true')
     # TODO: allow writing into sub file
@@ -278,15 +288,19 @@ if __name__ == "__main__":
         except yaml.YAMLError as exc:
             print(exc)
 
-    configuration['ipc_density'] = args.ipc_density
     configuration['force_rectangle_pads'] = args.force_rectangle_pads
-    
+
+    density_levels = ALL_DENSITY_LEVELS if args.all_densities else [args.ipc_density]
+
     for filepath in args.files:
         with open(filepath, 'r') as stream:
             try:
                 yaml_parsed = yaml.safe_load(stream)
                 for footprint in yaml_parsed:
-                    print("generate {name}.kicad_mod".format(name=footprint))
-                    create_footprint(footprint, configuration , **yaml_parsed.get(footprint))
+                    for density in density_levels:
+                        configuration['ipc_density'] = density
+                        fp_name = footprint
+                        print("generate {name}.kicad_mod".format(name=fp_name))
+                        create_footprint(fp_name, configuration, **yaml_parsed.get(footprint))
             except yaml.YAMLError as exc:
                 print(exc)

@@ -45,29 +45,29 @@ if __name__ == '__main__':
         for rows in range(1,41):
             makePinHeadStraight(rows, cols, rm, rm, cols * singlecol_packwidth + singlecol_packoffset,
                                 singlecol_packwidth / 2 + singlecol_packoffset,
-                                singlecol_packwidth / 2 + singlecol_packoffset, ddrill, pad, [], "/Pin_Headers", "Pin_Header", "pin header",
+                                singlecol_packwidth / 2 + singlecol_packoffset, ddrill, pad, [], "Pin_Headers", "Pin_Header", "pin header",
                                 [0, 0, 0], [1, 1, 1], [0, 0, 0], "${KISYS3DMOD}")
             makePinHeadAngled(rows, cols, rm, rm, angled_pack_width, angled_pack_offset, angled_pin_length, angled_pin_width, ddrill, pad,
-                              [], "/Pin_Headers", "Pin_Header", "pin header", [0, 0, 0], [1, 1, 1], [0, 0, 0], "${KISYS3DMOD}")
+                              [], "Pin_Headers", "Pin_Header", "pin header", [0, 0, 0], [1, 1, 1], [0, 0, 0], "${KISYS3DMOD}")
             if rows != 1 or cols == 2:
               if cols == 2:
                   makePinHeadStraightSMD(rows, cols, rm, rm, rmx_pad_offset[cols-1], rmx_pin_length[cols-1], pin_width, cols * singlecol_packwidth + singlecol_packoffset,
                                       singlecol_packwidth / 2 + singlecol_packoffset,
                                       singlecol_packwidth / 2 + singlecol_packoffset, dual_pad_smd,
-                                         True, [], "/Pin_Headers", "Pin_Header", "pin header",
+                                         True, [], "Pin_Headers", "Pin_Header", "pin header",
                                          [0, 0, 0], [1, 1, 1], [0, 0, 0], "${KISYS3DMOD}")
               if cols==1:
                   makePinHeadStraightSMD(rows, cols, rm, rm, rmx_pad_offset[cols-1], rmx_pin_length[cols-1], pin_width,
                                      cols * singlecol_packwidth + singlecol_packoffset,
                                      singlecol_packwidth / 2 + singlecol_packoffset,
                                      singlecol_packwidth / 2 + singlecol_packoffset, single_pad_smd,
-                                     True, [], "/Pin_Headers", "Pin_Header", "pin header",
+                                     True, [], "Pin_Headers", "Pin_Header", "pin header",
                                      [0, 0, 0], [1, 1, 1], [0, 0, 0], "${KISYS3DMOD}")
                   makePinHeadStraightSMD(rows, cols, rm, rm, rmx_pad_offset[cols-1], rmx_pin_length[cols-1], pin_width,
                                      cols * singlecol_packwidth + singlecol_packoffset,
                                      singlecol_packwidth / 2 + singlecol_packoffset,
                                      singlecol_packwidth / 2 + singlecol_packoffset, single_pad_smd,
-                                     False, [], "/Pin_Headers", "Pin_Header", "pin header",
+                                     False, [], "Pin_Headers", "Pin_Header", "pin header",
                                      [0, 0, 0], [1, 1, 1], [0, 0, 0], "${KISYS3DMOD}")
 
     rm=2.00

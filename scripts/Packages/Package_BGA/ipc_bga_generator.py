@@ -12,10 +12,24 @@ sys.path.append(os.path.join(sys.path[0], "..", "..", ".."))
 from KicadModTree import *  # NOQA
 from KicadModTree.nodes.base.Pad import Pad  # NOQA
 sys.path.append(os.path.join(sys.path[0], "..", "..", "tools"))  # load parent path of tools
+from ipc_density_helpers import (
+    ALL_DENSITY_LEVELS, DENSITY_LETTER_MAP,
+    get_density_subdir, add_pin1_marker_triangle, add_pin1_marker_circle
+)
 
 from KicadModTree import *
 import itertools
 from string import ascii_uppercase
+
+ipc_density = 'nominal'
+generate_all_densities = True
+
+# BGA courtyard offsets per density level
+BGA_COURTYARD_OFFSETS = {
+    'most':    1.0,
+    'nominal': 0.5,
+    'least':   0.25,
+}
 
 def generateFootprint(config, fpParams, fpId):
     createFp = False
@@ -47,9 +61,13 @@ def generateFootprint(config, fpParams, fpId):
         print("The config file must include 'ball_type' and 'ball_diameter' or 'pad_diameter'. No footprint generated.")
 
     if createFp:
-        __createFootprintVariant(config, fpParams, fpId)
+        density_levels = ALL_DENSITY_LEVELS if generate_all_densities else [ipc_density]
+        for density_level in density_levels:
+            __createFootprintVariant(config, fpParams, fpId, density_level)
 
-def __createFootprintVariant(config, fpParams, fpId):
+def __createFootprintVariant(config, fpParams, fpId, density_level='nominal'):
+    fpId_density = fpId
+    density_dir = get_density_subdir(density_level)
     pkgX = fpParams["body_size_x"]
     pkgY = fpParams["body_size_y"]
     layoutX = fpParams["layout_x"]
@@ -86,7 +104,7 @@ def __createFootprintVariant(config, fpParams, fpId):
         else:
             raise KeyError('{}: Either pitch or both pitch_x and pitch_y must be given.'.format(fpId))
 
-    f = Footprint(fpId)
+    f = Footprint(fpId_density)
     f.setAttribute("smd")
     if "mask_margin" in fpParams: f.setMaskMargin(fpParams["mask_margin"])
     if "paste_margin" in fpParams: f.setPasteMargin(fpParams["paste_margin"])
@@ -108,7 +126,7 @@ def __createFootprintVariant(config, fpParams, fpId):
     chamfer = min(config['fab_bevel_size_absolute'], min(pkgX, pkgY) * config['fab_bevel_size_relative'])
     
     silkOffset = config['silk_fab_offset']
-    crtYdOffset = config['courtyard_offset']['bga']
+    crtYdOffset = BGA_COURTYARD_OFFSETS.get(density_level, config['courtyard_offset']['bga'])
     
     def crtYdRound(x):
         # Round away from zero for proper courtyard calculation
@@ -154,7 +172,7 @@ def __createFootprintVariant(config, fpParams, fpId):
     # Text
     f.append(Text(type="reference", text="REF**", at=[xCenter, yRef],
                   layer="F.SilkS", size=s1, thickness=t1))
-    f.append(Text(type="value", text=fpId, at=[xCenter, yValue],
+    f.append(Text(type="value", text=fpId_density, at=[xCenter, yValue],
                   layer="F.Fab", size=s1, thickness=t1))
     f.append(Text(type="user", text="%R", at=[xCenter, yCenter],
                   layer="F.Fab", size=s2, thickness=t2))
@@ -180,6 +198,24 @@ def __createFootprintVariant(config, fpParams, fpId):
                                     [xLeftSilk, yBottomSilk],
                                     [xLeftSilk, yChamferSilk]],
                           layer="F.SilkS", width=wSilkS))
+
+    # Pin 1 markers
+    body_edge = {
+        'left': xLeftFab, 'right': xRightFab,
+        'top': yTopFab, 'bottom': yBottomFab
+    }
+    bga_device_params = {
+        'num_pins_x': layoutX, 'num_pins_y': layoutY,
+        'pitch': fpParams.get('pitch', fpParams.get('pitch_x', 0))
+    }
+    pin1_x = xPadLeft
+    pin1_y = yPadTop
+    pad_sz = fpParams['pad_size']
+    add_pin1_marker_triangle(f, (pin1_x, pin1_y), (pad_sz[0], pad_sz[1]),
+                             approach='top',
+                             silk_line_width=wSilkS)
+    add_pin1_marker_circle(f, body_edge, {}, bga_device_params,
+                           fab_line_width=wFab)
 
     # Pads
     balls = layoutX * layoutY
@@ -215,8 +251,8 @@ def __createFootprintVariant(config, fpParams, fpId):
     f.setDescription("{0}, {1}x{2}mm, {3} Ball, {4}x{5} Layout, {6}mm Pitch, {7}".format(fpParams["description"], pkgY, pkgX, balls, layoutX, layoutY, pitchString, fpParams["size_source"]))
     f.setTags("{} {} {}{}".format(packageType, balls, pitchString, additionalTag))
 
-    outputDir = 'Package_{lib_name:s}.pretty/'.format(lib_name=packageType)
-    if not os.path.isdir(outputDir): #returns false if path does not yet exist!! (Does not check path validity)
+    outputDir = os.path.join(density_dir, 'Package_{lib_name:s}.pretty'.format(lib_name=packageType), '')
+    if not os.path.isdir(outputDir):
         os.makedirs(outputDir)
     filename = '{outdir:s}{fpId:s}.kicad_mod'.format(outdir=outputDir, fpId=fpId)
     
@@ -235,8 +271,19 @@ if __name__ == '__main__':
     parser.add_argument('--global_config', type=str, nargs='?', help='the config file defining how the footprint will look like. (KLC)', default='../../tools/global_config_files/config_KLCv3.0.yaml')
     # parser.add_argument('--series_config', type=str, nargs='?', help='the config file defining series parameters.', default='../package_config_KLCv3.yaml')
     parser.add_argument('--ipc_doc', type=str, nargs='?', help='IPC definition document', default='ipc_7351b_bga_land_patterns.yaml')
+    parser.add_argument('--density', type=str, nargs='?', help='IPC density level (L,N,M)', default='N')
+    parser.add_argument('--all-densities', action='store_true', help='Generate footprints for all three IPC density levels (M, N, L)')
     parser.add_argument('-v', '--verbose', action='count', help='set debug level')
     args = parser.parse_args()
+    
+    if args.all_densities:
+        generate_all_densities = True
+    else:
+        generate_all_densities = False
+        if args.density == 'L':
+            ipc_density = 'least'
+        elif args.density == 'M':
+            ipc_density = 'most'
     
     if args.verbose:
         DEBUG_LEVEL = args.verbose

@@ -200,6 +200,8 @@ class KicadFileHandler(FileHandler):
                   ['layer', node.layer],
                   ['width', _get_layer_width(node.layer, node.width)]
                  ]  # NOQA
+        if getattr(node, 'fill', False):
+            sexpr.append(['fill', 'solid'])
 
         return sexpr
 
@@ -374,5 +376,7 @@ class KicadFileHandler(FileHandler):
                  ['layer', node.layer],
                  ['width', _get_layer_width(node.layer, node.width)]
                 ]  # NOQA
+        if getattr(node, 'fill', False):
+            sexpr.append(['fill', 'solid'])
 
         return sexpr

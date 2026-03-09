@@ -12,8 +12,13 @@ from KicadModTree import *  # NOQA
 from KicadModTree.nodes.base.Pad import Pad  # NOQA
 sys.path.append(os.path.join(sys.path[0], "..", "..", "tools"))  # load parent path of tools
 from footprint_text_fields import addTextFields
+from ipc_density_helpers import (
+    ALL_DENSITY_LEVELS, DENSITY_LETTER_MAP,
+    get_density_subdir, add_pin1_marker_triangle, add_pin1_marker_circle
+)
 
 ipc_density = 'nominal'
+generate_all_densities = True
 ipc_doc_file = '../ipc_definitions.yaml'
 category = 'LCC'
 
@@ -159,6 +164,11 @@ class QFP():
         return Pad
 
     def generateFootprint(self, device_params):
+        density_levels = ALL_DENSITY_LEVELS if generate_all_densities else [ipc_density]
+        for density_level in density_levels:
+            self.__createFootprintVariant(device_params, density_level)
+
+    def __createFootprintVariant(self, device_params, density_level='nominal'):
         fab_line_width = self.configuration.get('fab_line_width', 0.1)
         silk_line_width = self.configuration.get('silk_line_width', 0.12)
 
@@ -178,7 +188,7 @@ class QFP():
 
         ipc_reference = 'ipc_spec_j_lead'
 
-        ipc_data_set = self.ipc_defintions[ipc_reference][ipc_density]
+        ipc_data_set = self.ipc_defintions[ipc_reference][density_level]
         ipc_round_base = self.ipc_defintions[ipc_reference]['round_base']
 
         pad_details = self.calcPadDetails(device_params, ipc_data_set, ipc_round_base)
@@ -201,6 +211,8 @@ class QFP():
             pitch=device_params['pitch'],
             suffix=suffix
             ).replace('__','_').lstrip('_')
+
+        density_dir = get_density_subdir(density_level)
 
         fp_name_2 = name_format.format(
             man=device_params.get('manufacturer',''),
@@ -374,6 +386,19 @@ class QFP():
             width=configuration['fab_line_width'],
             layer="F.Fab"))
 
+        # # ####################### Pin 1 Markers ##############################
+
+        # Pin 1 is in the 'first' pad group (top-center area)
+        pd1 = pad_details['first']
+        pin1_x = pd1['start'][0]
+        pin1_y = pd1['start'][1]
+        pin1_pad_size = (pd1['size'][0], pd1['size'][1])
+        add_pin1_marker_triangle(kicad_mod, (pin1_x, pin1_y), pin1_pad_size,
+                                 approach='top',
+                                 silk_line_width=configuration['silk_line_width'])
+        add_pin1_marker_circle(kicad_mod, body_edge, pad_details, device_params,
+                               fab_line_width=configuration['fab_line_width'])
+
         # # ############################ CrtYd ##################################
 
         off = ipc_data_set['courtyard']
@@ -439,8 +464,8 @@ class QFP():
 
         kicad_mod.append(Model(filename=model_name))
 
-        output_dir = '{lib_name:s}.pretty/'.format(lib_name=lib_name)
-        if not os.path.isdir(output_dir): #returns false if path does not yet exist!! (Does not check path validity)
+        output_dir = os.path.join(density_dir, '{lib_name:s}.pretty'.format(lib_name=lib_name), '')
+        if not os.path.isdir(output_dir):
             os.makedirs(output_dir)
         filename =  '{outdir:s}{fp_name:s}.kicad_mod'.format(outdir=output_dir, fp_name=fp_name)
 
@@ -454,14 +479,19 @@ if __name__ == "__main__":
     parser.add_argument('--global_config', type=str, nargs='?', help='the config file defining how the footprint will look like. (KLC)', default='../../tools/global_config_files/config_KLCv3.0.yaml')
     parser.add_argument('--series_config', type=str, nargs='?', help='the config file defining series parameters.', default='../package_config_KLCv3.yaml')
     parser.add_argument('--density', type=str, nargs='?', help='Density level (L,N,M)', default='N')
+    parser.add_argument('--all-densities', action='store_true', help='Generate footprints for all three IPC density levels (M, N, L)')
     parser.add_argument('--ipc_doc', type=str, nargs='?', help='IPC definition document', default='../ipc_definitions.yaml')
     parser.add_argument('--force_rectangle_pads', action='store_true', help='Force the generation of rectangle pads instead of rounded rectangle')
     args = parser.parse_args()
 
-    if args.density == 'L':
-        ipc_density = 'least'
-    elif args.density == 'M':
-        ipc_density = 'most'
+    if args.all_densities:
+        generate_all_densities = True
+    else:
+        generate_all_densities = False
+        if args.density == 'L':
+            ipc_density = 'least'
+        elif args.density == 'M':
+            ipc_density = 'most'
 
     ipc_doc_file = args.ipc_doc
 

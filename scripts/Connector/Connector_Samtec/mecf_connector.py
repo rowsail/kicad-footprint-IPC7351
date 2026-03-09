@@ -198,18 +198,18 @@ def generate_one_footprint(pol, n, configuration):
 
 
     ## create cutout
-    kicad_mod.append(Line(start=[-K[n]/2.0, bot, 2],
-                          end=[-K[n]/2.0, top, 2], layer='Edge.Cuts', width=configuration['edge_cuts_line_width'])) #left line
-    kicad_mod.append(Line(start=[K[n]/2.0, bot, 2],
+    kicad_mod.append(Line(start=[-K[n]/2.0, bot],
+                          end=[-K[n]/2.0, top], layer='Edge.Cuts', width=configuration['edge_cuts_line_width'])) #left line
+    kicad_mod.append(Line(start=[K[n]/2.0, bot],
                           end=[K[n]/2.0, top], layer='Edge.Cuts', width=configuration['edge_cuts_line_width'])) #right line
 
 
     ## grid ends
     nextGrid = math.ceil((K[n]/2.0)/0.25 + 1.0) * 0.25
     #nextGrid = roundToBase(K[n]/2, 0.25)
-    kicad_mod.append(Line(start=[-nextGrid, top, 2],
-        end=[-K[n]/2.0, top, 2], layer='Edge.Cuts', width=configuration['edge_cuts_line_width'])) #left line
-    kicad_mod.append(Line(start=[+nextGrid, top, 2],
+    kicad_mod.append(Line(start=[-nextGrid, top],
+        end=[-K[n]/2.0, top], layer='Edge.Cuts', width=configuration['edge_cuts_line_width'])) #left line
+    kicad_mod.append(Line(start=[+nextGrid, top],
         end=[K[n]/2.0, top], layer='Edge.Cuts', width=configuration['edge_cuts_line_width'])) #right line
 
 

@@ -202,8 +202,8 @@ def makePotentiometerHorizontal(class_name="", wbody=0, hbody=0, dscrew=0, style
             pow_rat = pow_rat + " = 1/{0}W".format(int(1 / R_POW))
     
     tgs = specialtags
-    print tgs
-    print class_name
+    print(tgs)
+    print(class_name)
     tgs.append(class_name)
     if len(pow_rat) > 0:
         tgs.append(pow_rat)
@@ -1017,11 +1017,11 @@ def makeSpindleTrimmer(class_name, wbody, hbody, pinxoffset, pinyoffset, rmx2, r
     if style == "screwleft" and wscrew > 0:
         addRectWithKeepout(kicad_modg, lscrew_slk, tscrew_slk, wscrew_slk, hscrew_slk, 'F.SilkS', lw_slk, keepouts)
         addHLineWithKeepout(kicad_modg, lscrew_slk, lscrew_slk+wscrew_slk/2.0, tscrew_slk+hscrew_slk/2.0, 'F.SilkS', lw_slk, keepouts)
-    '''elif style == "screwtop":
-        if screwstyle == "slit":
-            addSlitScrewWithKeepouts(kicad_modg, lscrew_slk, tscrew_slk, wscrew_slk / 2.0, 'F.SilkS', lw_slk, keepouts)
-        else:
-            addCrossScrewWithKeepouts(kicad_modg, lscrew_slk, tscrew_slk, wscrew_slk / 2.0, 'F.SilkS', lw_slk, keepouts)'''
+    # elif style == "screwtop":
+    #     if screwstyle == "slit":
+    #         addSlitScrewWithKeepouts(kicad_modg, lscrew_slk, tscrew_slk, wscrew_slk / 2.0, 'F.SilkS', lw_slk, keepouts)
+    #     else:
+    #         addCrossScrewWithKeepouts(kicad_modg, lscrew_slk, tscrew_slk, wscrew_slk / 2.0, 'F.SilkS', lw_slk, keepouts)
 
     # create courtyard
     kicad_mod.append(RectLine(start=[roundG(l_crt + offset[0], grid_crt), roundG(t_crt + offset[1], grid_crt)],
@@ -1050,7 +1050,8 @@ def makeSpindleTrimmer(class_name, wbody, hbody, pinxoffset, pinyoffset, rmx2, r
     # write file
     file_handler = KicadFileHandler(kicad_mod)
     file_handler.writeFile(footprint_name + '.kicad_mod')
-'''if __name__ == '__main__':
+'''
+if __name__ == '__main__':
 
     # handle arguments
     parser = argparse.ArgumentParser()
@@ -1118,30 +1119,30 @@ def makeSpindleTrimmer(class_name, wbody, hbody, pinxoffset, pinyoffset, rmx2, r
     print(args)
     
     # some special handling of arguments, especially list types
-    '''if not args.x_3d:
-        x_3d = [0, 0, 0]
-    else:
-        x_3d = args.x_3d
-    
-    if not args.s_3d:
-        s_3d = [1, 1, 1]
-    else:
-        s_3d = args.s_3d
-    
-    if not args.r_3d:
-        r_3d = [0, 0, 0]
-    else:
-        r_3d = args.r_3d
-    
-    if not args.specialtags:
-        specialtags = []
-    else:
-        specialtags = args.specialtags
-    
-    if not args.name_additions:
-        name_additions = []
-    else:
-        name_additions = args.name_additions'''
+    # if not args.x_3d:
+    #     x_3d = [0, 0, 0]
+    # else:
+    #     x_3d = args.x_3d
+    #
+    # if not args.s_3d:
+    #     s_3d = [1, 1, 1]
+    # else:
+    #     s_3d = args.s_3d
+    #
+    # if not args.r_3d:
+    #     r_3d = [0, 0, 0]
+    # else:
+    #     r_3d = args.r_3d
+    #
+    # if not args.specialtags:
+    #     specialtags = []
+    # else:
+    #     specialtags = args.specialtags
+    #
+    # if not args.name_additions:
+    #     name_additions = []
+    # else:
+    #     name_additions = args.name_additions
         
     # for troubleshooting, below are shell commands to generate a footprint in various ways:
     # full: all arguments are given with non-default values
@@ -1167,10 +1168,10 @@ def makeSpindleTrimmer(class_name, wbody, hbody, pinxoffset, pinyoffset, rmx2, r
         if (None in [args.wscrew, args.wshaft, args.dshaft, args.rmx, args.rmy]):
             sys.exit("Error: All required arguments were not provided for a horizontal potentiometer")
         else:
-            '''if not args.style:
-                style = "normal"
-            else:
-                style = args.style'''
+            # if not args.style:
+            #     style = "normal"
+            # else:
+            #     style = args.style
             
             makePotentiometerHorizontal(class_name=args.class_name, wbody=args.wbody, hbody=args.hbody, wscrew=args.wscrew, dscrew=args.dscrew,
                             wshaft=args.wshaft, dshaft=args.dshaft, style=args.style, pinxoffset=args.pinxoffset, pinyoffset=args.pinyoffset,

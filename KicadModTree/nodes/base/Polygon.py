@@ -48,6 +48,7 @@ class Polygon(Node):
 
         self.layer = kwargs.get('layer', 'F.SilkS')
         self.width = kwargs.get('width')
+        self.fill = kwargs.get('fill', False)
 
     def rotate(self, angle, origin=(0, 0), use_degrees=True):
         r""" Rotate polygon around given origin
